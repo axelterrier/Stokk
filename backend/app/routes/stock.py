@@ -4,9 +4,10 @@ from sqlalchemy import select, update as sql_update, delete as sql_delete
 from uuid import UUID
 
 from app.db.database import get_db
-from app.models.models import StockItem, ExpiryDate
+from app.models.models import StockItem, ExpiryDate, User
 from app.schemas.schemas import ScanResponse, StockItemCreate, StockItemOut, StockItemUpdate
 from app.services.product_service import lookup_product
+from app.core.security import get_current_user
 
 router = APIRouter()
 
@@ -14,7 +15,7 @@ router = APIRouter()
 # ── GET /scan/{barcode} ───────────────────────────────────────────────────────
 
 @router.get("/scan/{barcode}", response_model=ScanResponse)
-async def scan_barcode(barcode: str, db: AsyncSession = Depends(get_db)):
+async def scan_barcode(barcode: str, db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
     """
     Lookup d'un code-barres : retourne les infos produit depuis le cache
     PostgreSQL ou le dump MongoDB OpenFoodFacts.
@@ -28,7 +29,7 @@ async def scan_barcode(barcode: str, db: AsyncSession = Depends(get_db)):
 # ── POST /stock ───────────────────────────────────────────────────────────────
 
 @router.post("/stock", response_model=StockItemOut, status_code=201)
-async def add_stock_item(payload: StockItemCreate, db: AsyncSession = Depends(get_db)):
+async def add_stock_item(payload: StockItemCreate, db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
     from sqlalchemy.orm import selectinload
 
     product, _ = await lookup_product(payload.product_barcode, db)
@@ -71,7 +72,7 @@ async def add_stock_item(payload: StockItemCreate, db: AsyncSession = Depends(ge
 # ── GET /stock ────────────────────────────────────────────────────────────────
 
 @router.get("/stock", response_model=list[StockItemOut])
-async def list_stock(db: AsyncSession = Depends(get_db)):
+async def list_stock(db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
     """Liste tous les articles en stock."""
     from sqlalchemy.orm import selectinload
     result = await db.execute(
@@ -88,7 +89,7 @@ async def list_stock(db: AsyncSession = Depends(get_db)):
 # ── PATCH /stock/{item_id} ────────────────────────────────────────────────────
 
 @router.patch("/stock/{item_id}", response_model=StockItemOut)
-async def update_stock_item(item_id: UUID, payload: StockItemUpdate, db: AsyncSession = Depends(get_db)):
+async def update_stock_item(item_id: UUID, payload: StockItemUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
     from sqlalchemy.orm import selectinload
 
     if not await db.get(StockItem, item_id):
@@ -152,7 +153,7 @@ async def update_stock_item(item_id: UUID, payload: StockItemUpdate, db: AsyncSe
 # ── DELETE /stock/{item_id} ───────────────────────────────────────────────────
 
 @router.delete("/stock/{item_id}", status_code=204)
-async def delete_stock_item(item_id: UUID, db: AsyncSession = Depends(get_db)):
+async def delete_stock_item(item_id: UUID, db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
     item = await db.get(StockItem, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Article introuvable")

@@ -6,6 +6,7 @@ from app.core.config import settings
 from app.db.database import init_db
 from app.models.models import User, Product, StockItem, ExpiryDate  # noqa: F401 — needed for Base.metadata
 from app.routes.stock import router as stock_router
+from app.routes.auth import router as auth_router
 
 
 @asynccontextmanager
@@ -29,6 +30,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router, prefix="/api/v1", tags=["auth"])
 app.include_router(stock_router, prefix="/api/v1", tags=["stock"])
 
 
