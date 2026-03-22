@@ -1,4 +1,4 @@
-import type { ScanResponse, StockItem, StockItemCreate, StockItemUpdate } from '@/types'
+import type { ScanResponse, StockItem, StockItemCreate, StockItemUpdate, AppUser, UserCreate, UserUpdate, Location, LocationCreate, LocationUpdate } from '@/types'
 
 const BASE = import.meta.env.VITE_API_URL as string
 
@@ -68,4 +68,28 @@ export const api = {
 
   deleteStock: (itemId: string) =>
     apiFetch<void>(`/stock/${itemId}`, { method: 'DELETE' }),
+
+  listUsers: () =>
+    apiFetch<AppUser[]>('/users'),
+
+  createUser: (payload: UserCreate) =>
+    apiFetch<AppUser>('/users', { method: 'POST', body: JSON.stringify(payload) }),
+
+  updateUser: (userId: string, payload: UserUpdate) =>
+    apiFetch<AppUser>(`/users/${userId}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+
+  deleteUser: (userId: string) =>
+    apiFetch<void>(`/users/${userId}`, { method: 'DELETE' }),
+
+  listLocations: () =>
+    apiFetch<Location[]>('/locations'),
+
+  createLocation: (payload: LocationCreate) =>
+    apiFetch<Location>('/locations', { method: 'POST', body: JSON.stringify(payload) }),
+
+  updateLocation: (locId: string, payload: LocationUpdate) =>
+    apiFetch<Location>(`/locations/${locId}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+
+  deleteLocation: (locId: string) =>
+    apiFetch<void>(`/locations/${locId}`, { method: 'DELETE' }),
 }

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update as sql_update, delete as sql_delete
+from sqlalchemy.orm import selectinload
 from uuid import UUID
 
 from app.db.database import get_db
@@ -12,26 +13,16 @@ from app.core.security import get_current_user
 router = APIRouter()
 
 
-# ── GET /scan/{barcode} ───────────────────────────────────────────────────────
-
 @router.get("/scan/{barcode}", response_model=ScanResponse)
 async def scan_barcode(barcode: str, db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
-    """
-    Lookup d'un code-barres : retourne les infos produit depuis le cache
-    PostgreSQL ou le dump MongoDB OpenFoodFacts.
-    """
     product, source = await lookup_product(barcode, db)
     if not product:
         return ScanResponse(found=False)
     return ScanResponse(found=True, source=source, product=product)
 
 
-# ── POST /stock ───────────────────────────────────────────────────────────────
-
 @router.post("/stock", response_model=StockItemOut, status_code=201)
 async def add_stock_item(payload: StockItemCreate, db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
-    from sqlalchemy.orm import selectinload
-
     product, _ = await lookup_product(payload.product_barcode, db)
     if not product:
         raise HTTPException(status_code=404, detail="Produit introuvable — scannez d'abord le code-barres")
@@ -40,7 +31,7 @@ async def add_stock_item(payload: StockItemCreate, db: AsyncSession = Depends(ge
         product_barcode=payload.product_barcode,
         quantity=payload.quantity,
         unit=payload.unit,
-        location=payload.location,
+        location_id=payload.location_id,
         opened=payload.opened,
     )
     db.add(item)
@@ -57,53 +48,45 @@ async def add_stock_item(payload: StockItemCreate, db: AsyncSession = Depends(ge
 
     await db.commit()
 
-    # Recharger avec les relations
     result = await db.execute(
         select(StockItem)
         .where(StockItem.id == item.id)
         .options(
             selectinload(StockItem.product),
             selectinload(StockItem.expiry_date),
+            selectinload(StockItem.location),
         )
     )
     return result.scalar_one()
 
 
-# ── GET /stock ────────────────────────────────────────────────────────────────
-
 @router.get("/stock", response_model=list[StockItemOut])
 async def list_stock(db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
-    """Liste tous les articles en stock."""
-    from sqlalchemy.orm import selectinload
     result = await db.execute(
         select(StockItem)
         .options(
             selectinload(StockItem.product),
             selectinload(StockItem.expiry_date),
+            selectinload(StockItem.location),
         )
         .order_by(StockItem.added_at.desc())
     )
     return result.scalars().all()
 
 
-# ── PATCH /stock/{item_id} ────────────────────────────────────────────────────
-
 @router.patch("/stock/{item_id}", response_model=StockItemOut)
 async def update_stock_item(item_id: UUID, payload: StockItemUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
-    from sqlalchemy.orm import selectinload
-
     if not await db.get(StockItem, item_id):
         raise HTTPException(status_code=404, detail="Article introuvable")
 
-    # Mise à jour des champs simples via UPDATE explicite
     fields = payload.model_fields_set
     update_values = {}
     if "quantity" in fields:
         update_values["quantity"] = payload.quantity
     if "unit" in fields:
         update_values["unit"] = payload.unit
-    if "location" in fields:
-        update_values["location"] = payload.location
+    if "location_id" in fields:
+        update_values["location_id"] = payload.location_id
     if "opened" in fields:
         update_values["opened"] = payload.opened
 
@@ -112,7 +95,6 @@ async def update_stock_item(item_id: UUID, payload: StockItemUpdate, db: AsyncSe
             sql_update(StockItem).where(StockItem.id == item_id).values(**update_values)
         )
 
-    # Gestion de la DLC
     if payload.clear_expiry:
         await db.execute(
             sql_delete(ExpiryDate).where(ExpiryDate.stock_item_id == item_id)
@@ -144,13 +126,12 @@ async def update_stock_item(item_id: UUID, payload: StockItemUpdate, db: AsyncSe
         .options(
             selectinload(StockItem.product),
             selectinload(StockItem.expiry_date),
+            selectinload(StockItem.location),
         )
         .execution_options(populate_existing=True)
     )
     return result.scalar_one()
 
-
-# ── DELETE /stock/{item_id} ───────────────────────────────────────────────────
 
 @router.delete("/stock/{item_id}", status_code=204)
 async def delete_stock_item(item_id: UUID, db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):

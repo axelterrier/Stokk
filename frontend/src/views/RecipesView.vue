@@ -2,7 +2,7 @@
   <div class="placeholder-view">
     <div class="placeholder-view__icon">🍽️</div>
     <h1 class="placeholder-view__title">Recettes</h1>
-    <p class="placeholder-view__desc">Les suggestions de recettes basées sur votre stock arriveront ici (intégration Mistral AI).</p>
+    <p class="placeholder-view__desc">Les suggestions de recettes basées sur votre stock arriveront ici.</p>
   </div>
 </template>
 

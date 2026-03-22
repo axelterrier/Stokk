@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
-import type { Product, StockItemCreate } from '@/types'
+import { reactive, computed } from 'vue'
+import type { Product, StockItemCreate, Location } from '@/types'
 
 const props = defineProps<{
   product: Product
+  locations: Location[]
   loading: boolean
 }>()
 
@@ -13,23 +14,67 @@ const emit = defineEmits<{
 }>()
 
 const UNITS = ['unité', 'g', 'kg', 'ml', 'L', 'portion']
-const LOCATIONS = ['Placard', 'Frigo', 'Congélateur', 'Cave', 'Autre']
+
+// ── Pré-remplissage depuis le champ quantity d'OpenFoodFacts ──────
+function parseQuantityStr(qs: string | undefined): { quantity: number; unit: string } | null {
+  if (!qs) return null
+
+  // Normalise : "6 x 330 ml", "6 × 33 cl", "330ml", "1,5 L" …
+  // Cherche d'abord le format N x M unit (prend M et unit)
+  const multi = qs.match(/\d+\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*([a-zA-Z]+)/i)
+  const raw = multi
+    ? { qty: multi[1], unit: multi[2] }
+    : qs.match(/(\d+(?:[.,]\d+)?)\s*([a-zA-Z]+)/i)
+      ? { qty: qs.match(/(\d+(?:[.,]\d+)?)\s*([a-zA-Z]+)/i)![1], unit: qs.match(/(\d+(?:[.,]\d+)?)\s*([a-zA-Z]+)/i)![2] }
+      : null
+
+  if (!raw) return null
+
+  let qty = parseFloat(raw.qty.replace(',', '.'))
+  const u = raw.unit.toLowerCase()
+
+  if (u === 'g')   return { quantity: qty, unit: 'g' }
+  if (u === 'kg')  return { quantity: qty, unit: 'kg' }
+  if (u === 'ml')  return { quantity: qty, unit: 'ml' }
+  if (u === 'l')   return { quantity: qty, unit: 'L' }
+  if (u === 'cl')  return { quantity: Math.round(qty * 10), unit: 'ml' }
+  if (u === 'dl')  return { quantity: Math.round(qty * 100), unit: 'ml' }
+
+  return null
+}
+
+const prefilled = parseQuantityStr(props.product.quantity_str)
 
 const form = reactive({
-  quantity: 1,
-  unit: 'unité',
-  location: '',
+  quantity: prefilled?.quantity ?? 1,
+  unit: prefilled?.unit ?? 'unité',
+  location_id: '',
   opened: false,
   expiry_date: '',
   alert_days_before: 3,
 })
+
+// Build flat ordered list with depth from the locations tree
+interface FlatLoc { loc: Location; depth: number }
+
+function buildFlat(parentId: string | null, depth: number): FlatLoc[] {
+  return props.locations
+    .filter(l => (l.parent_id ?? null) === parentId)
+    .flatMap(l => [{ loc: l, depth }, ...buildFlat(l.id, depth + 1)])
+}
+
+const flatLocations = computed<FlatLoc[]>(() => buildFlat(null, 0))
+
+function locLabel(depth: number, name: string): string {
+  return '\u00a0\u00a0'.repeat(depth * 2) + (depth > 0 ? '└ ' : '') + name
+}
 
 function onSubmit() {
   const payload: StockItemCreate = {
     product_barcode: props.product.barcode,
     quantity: form.quantity,
     unit: form.unit,
-    location: form.location || undefined,
+    location_id: form.location_id || undefined,
     opened: form.opened,
     expiry_date: form.expiry_date || undefined,
     alert_days_before: form.alert_days_before,
@@ -63,9 +108,13 @@ function onSubmit() {
       <!-- Emplacement -->
       <div class="field">
         <label class="label">Emplacement</label>
-        <select v-model="form.location" class="input">
+        <select v-model="form.location_id" class="input">
           <option value="">— choisir —</option>
-          <option v-for="loc in LOCATIONS" :key="loc" :value="loc">{{ loc }}</option>
+          <option
+            v-for="{ loc, depth } in flatLocations"
+            :key="loc.id"
+            :value="loc.id"
+          >{{ locLabel(depth, loc.name) }}</option>
         </select>
       </div>
 
@@ -141,7 +190,6 @@ function onSubmit() {
   cursor: pointer;
 }
 
-/* Toggle switch */
 .toggle-row {
   display: flex;
   align-items: center;

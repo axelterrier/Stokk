@@ -1,3 +1,22 @@
+export interface Location {
+  id: string
+  name: string
+  parent_id: string | null
+  color: string | null
+}
+
+export interface LocationCreate {
+  name: string
+  parent_id?: string | null
+  color?: string | null
+}
+
+export interface LocationUpdate {
+  name?: string
+  parent_id?: string | null
+  color?: string | null
+}
+
 export interface Product {
   barcode: string
   name: string
@@ -5,6 +24,7 @@ export interface Product {
   category?: string
   image_url?: string
   nutriscore?: 'A' | 'B' | 'C' | 'D' | 'E'
+  quantity_str?: string
   energy_kcal?: number
   proteins_g?: number
   carbs_g?: number
@@ -29,7 +49,7 @@ export interface StockItem {
   product_barcode: string
   quantity: number
   unit: string
-  location?: string
+  location?: Location
   opened: boolean
   added_at: string
   product: Product
@@ -39,7 +59,7 @@ export interface StockItem {
 export interface StockItemUpdate {
   quantity?: number
   unit?: string
-  location?: string | null
+  location_id?: string | null
   opened?: boolean
   expiry_date?: string | null
   alert_days_before?: number
@@ -50,8 +70,28 @@ export interface StockItemCreate {
   product_barcode: string
   quantity: number
   unit: string
-  location?: string
+  location_id?: string
   opened: boolean
   expiry_date?: string
   alert_days_before: number
+}
+
+export interface AppUser {
+  id: string
+  username: string
+  email: string
+  is_admin: boolean
+  created_at: string
+}
+
+export interface UserCreate {
+  username: string
+  email: string
+  password: string
+  is_admin: boolean
+}
+
+export interface UserUpdate {
+  password?: string
+  is_admin?: boolean
 }

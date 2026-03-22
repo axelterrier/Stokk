@@ -62,9 +62,7 @@ defineExpose({ focus: () => inputRef.value?.focus() })
         class="btn btn--primary scan-input__btn"
         :disabled="!barcode.trim() || loading"
         @click="submit"
-      >
-        Chercher
-      </button>
+      >OK</button>
     </div>
 
     <button class="scan-input__camera-btn" @click="showCamera = true" :disabled="loading">
@@ -101,9 +99,11 @@ defineExpose({ focus: () => inputRef.value?.focus() })
 }
 
 .scan-input__icon { color: var(--color-muted); flex-shrink: 0; display: flex; }
+.scan-input__btn  { flex-shrink: 0; white-space: nowrap; }
 
 .scan-input__field {
   flex: 1;
+  min-width: 0;          /* empêche le min-width browser de manger l'espace */
   background: transparent;
   border: none;
   outline: none;

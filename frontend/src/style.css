@@ -18,6 +18,21 @@
   --transition:      .15s cubic-bezier(.4,0,.2,1);
 }
 
+[data-theme="dark"] {
+  --color-bg:        #1c1917;
+  --color-surface:   #292524;
+  --color-surface-2: #1c1917;
+  --color-border:    #44403c;
+  --color-text:      #fafaf9;
+  --color-muted:     #a8a29e;
+  --color-accent:    #f97316;
+  --color-accent-dk: #ea580c;
+  --color-success:   #22c55e;
+  --color-danger:    #f87171;
+  --shadow-sm:       0 1px 3px rgba(0,0,0,.3), 0 1px 2px rgba(0,0,0,.2);
+  --shadow-md:       0 4px 12px rgba(0,0,0,.4), 0 2px 4px rgba(0,0,0,.2);
+}
+
 /* ── Reset ──────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -111,6 +126,10 @@ select.input {
   padding-right: 2rem;
 }
 
+[data-theme="dark"] select.input {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23a8a29e'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z'/%3E%3C/svg%3E");
+}
+
 /* ── Label ──────────────────────────────────────────────────────── */
 .label {
   display: block;
@@ -131,6 +150,27 @@ select.input {
   border-top: 1px solid var(--color-border);
   margin: 1rem 0;
 }
+
+/* ── Dark mode badge overrides ───────────────────────────────────── */
+/* html[data-theme="dark"] bat les styles scoped (spécificité 0,2,1 > 0,2,0) */
+html[data-theme="dark"] .stock-card__opened {
+  background: rgba(194,65,12,.18); color: #fdba74; border-color: rgba(194,65,12,.35);
+}
+html[data-theme="dark"] .stock-card__delete:hover {
+  background: rgba(220,38,38,.15); border-color: rgba(220,38,38,.3);
+}
+html[data-theme="dark"] .loc--blue   { background: rgba(37,99,235,.18);   color: #93c5fd; border-color: rgba(37,99,235,.35); }
+html[data-theme="dark"] .loc--cyan   { background: rgba(8,145,178,.18);   color: #67e8f9; border-color: rgba(8,145,178,.35); }
+html[data-theme="dark"] .loc--green  { background: rgba(21,128,61,.18);   color: #86efac; border-color: rgba(21,128,61,.35); }
+html[data-theme="dark"] .loc--yellow { background: rgba(161,98,7,.18);    color: #fde047; border-color: rgba(161,98,7,.35); }
+html[data-theme="dark"] .loc--orange { background: rgba(194,65,12,.18);   color: #fdba74; border-color: rgba(194,65,12,.35); }
+html[data-theme="dark"] .loc--red    { background: rgba(220,38,38,.18);   color: #fca5a5; border-color: rgba(220,38,38,.35); }
+html[data-theme="dark"] .loc--purple { background: rgba(124,58,237,.18);  color: #c4b5fd; border-color: rgba(124,58,237,.35); }
+html[data-theme="dark"] .loc--pink   { background: rgba(190,24,93,.18);   color: #f9a8d4; border-color: rgba(190,24,93,.35); }
+html[data-theme="dark"] .expiry--ok      { background: rgba(21,128,61,.18);  color: #86efac; border-color: rgba(21,128,61,.35); }
+html[data-theme="dark"] .expiry--soon    { background: rgba(161,98,7,.18);   color: #fde047; border-color: rgba(161,98,7,.35); }
+html[data-theme="dark"] .expiry--urgent  { background: rgba(194,65,12,.18);  color: #fdba74; border-color: rgba(194,65,12,.35); }
+html[data-theme="dark"] .expiry--expired { background: rgba(220,38,38,.18);  color: #fca5a5; border-color: rgba(220,38,38,.35); }
 
 /* ── Animations ─────────────────────────────────────────────────── */
 @keyframes slideUp {

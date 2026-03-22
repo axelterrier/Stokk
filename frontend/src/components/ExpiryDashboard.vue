@@ -80,7 +80,7 @@ function expiryLabel(dateStr: string): string {
           </div>
           <div class="expiry-card__meta">
             <span>{{ item.quantity }} {{ item.unit }}</span>
-            <span v-if="item.location">· {{ item.location }}</span>
+            <span v-if="item.location">· {{ item.location?.name }}</span>
             <span v-if="item.opened" class="expiry-card__opened">Ouvert</span>
           </div>
           <span class="expiry-badge" :class="expiryClass(item.expiry_date!.expiry_date)">

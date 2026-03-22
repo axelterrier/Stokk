@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import type { Product, StockItem, StockItemCreate, StockItemUpdate } from '@/types'
+import type { Product, StockItem, StockItemCreate, StockItemUpdate, Location } from '@/types'
 import { api } from '@/composables/useApi'
 import ScanInput from '@/components/ScanInput.vue'
 import ProductCard from '@/components/ProductCard.vue'
@@ -19,6 +19,7 @@ const scanError      = ref<string | null>(null)
 const addSuccess     = ref(false)
 
 const stockItems  = ref<StockItem[]>([])
+const locations   = ref<Location[]>([])
 const editingItem = ref<StockItem | null>(null)
 const editLoading = ref(false)
 
@@ -97,7 +98,14 @@ async function onDelete(id: string) {
   }
 }
 
-onMounted(loadStock)
+async function onDeleteMany(ids: string[]) {
+  await Promise.allSettled(ids.map(id => api.deleteStock(id)))
+  stockItems.value = stockItems.value.filter(i => !ids.includes(i.id))
+}
+
+onMounted(async () => {
+  await Promise.all([loadStock(), api.listLocations().then(l => { locations.value = l })])
+})
 </script>
 
 <template>
@@ -126,6 +134,7 @@ onMounted(loadStock)
         <hr class="divider" />
         <AddStockForm
           :product="scannedProduct"
+          :locations="locations"
           :loading="addLoading"
           @submit="onAddStock"
           @cancel="onCancelAdd"
@@ -139,9 +148,11 @@ onMounted(loadStock)
       <ExpiryDashboard :items="stockItems" @edit="onEdit" />
       <StockList
         :items="stockItems"
+        :locations="locations"
         :loading="stockLoading"
         @edit="onEdit"
         @delete="onDelete"
+        @delete-many="onDeleteMany"
       />
     </div>
 
@@ -150,6 +161,7 @@ onMounted(loadStock)
   <EditStockModal
     v-if="editingItem"
     :item="editingItem"
+    :locations="locations"
     :loading="editLoading"
     @submit="onUpdateStock"
     @delete="onDelete($event); editingItem = null"

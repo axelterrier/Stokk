@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
-import type { StockItem, StockItemUpdate } from '@/types'
+import { reactive, ref, watch, computed } from 'vue'
+import type { StockItem, StockItemUpdate, Location } from '@/types'
 
 const props = defineProps<{
   item: StockItem
+  locations: Location[]
   loading: boolean
 }>()
 
@@ -16,34 +17,47 @@ const emit = defineEmits<{
 const confirmDelete = ref(false)
 
 const UNITS = ['unité', 'g', 'kg', 'ml', 'L', 'portion']
-const LOCATIONS = ['Placard', 'Frigo', 'Congélateur', 'Cave', 'Autre']
 
 const form = reactive({
   quantity: props.item.quantity,
   unit: props.item.unit,
-  location: props.item.location ?? '',
+  location_id: props.item.location?.id ?? '',
   opened: props.item.opened,
   expiry_date: props.item.expiry_date?.expiry_date ?? '',
   alert_days_before: props.item.expiry_date?.alert_days_before ?? 3,
   clear_expiry: false,
 })
 
-// Si l'item change (cas improbable mais propre)
 watch(() => props.item, (item) => {
   form.quantity = item.quantity
   form.unit = item.unit
-  form.location = item.location ?? ''
+  form.location_id = item.location?.id ?? ''
   form.opened = item.opened
   form.expiry_date = item.expiry_date?.expiry_date ?? ''
   form.alert_days_before = item.expiry_date?.alert_days_before ?? 3
   form.clear_expiry = false
 })
 
+// Flat ordered location list with depth
+interface FlatLoc { loc: Location; depth: number }
+
+function buildFlat(parentId: string | null, depth: number): FlatLoc[] {
+  return props.locations
+    .filter(l => (l.parent_id ?? null) === parentId)
+    .flatMap(l => [{ loc: l, depth }, ...buildFlat(l.id, depth + 1)])
+}
+
+const flatLocations = computed<FlatLoc[]>(() => buildFlat(null, 0))
+
+function locLabel(depth: number, name: string): string {
+  return '\u00a0\u00a0'.repeat(depth * 2) + (depth > 0 ? '└ ' : '') + name
+}
+
 function onSubmit() {
   const payload: StockItemUpdate = {
     quantity: form.quantity,
     unit: form.unit,
-    location: form.location || null,
+    location_id: form.location_id || null,
     opened: form.opened,
     alert_days_before: form.alert_days_before,
   }
@@ -92,9 +106,13 @@ function onSubmit() {
         <!-- Emplacement -->
         <div class="field">
           <label class="label">Emplacement</label>
-          <select v-model="form.location" class="input">
+          <select v-model="form.location_id" class="input">
             <option value="">— aucun —</option>
-            <option v-for="loc in LOCATIONS" :key="loc" :value="loc">{{ loc }}</option>
+            <option
+              v-for="{ loc, depth } in flatLocations"
+              :key="loc.id"
+              :value="loc.id"
+            >{{ locLabel(depth, loc.name) }}</option>
           </select>
         </div>
 
@@ -137,7 +155,6 @@ function onSubmit() {
       </label>
 
       <div class="modal__actions">
-        <!-- Suppression avec confirmation inline -->
         <button
           v-if="!confirmDelete"
           class="btn btn--danger modal__delete"
@@ -198,23 +215,9 @@ function onSubmit() {
   align-items: center;
   justify-content: space-between;
 }
-
-.modal__title-wrap {
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-}
-
-.modal__title {
-  font-size: 1.05rem;
-  font-weight: 700;
-}
-
-.modal__close {
-  padding: .3rem .55rem;
-  font-size: .8rem;
-}
-
+.modal__title-wrap { display: flex; align-items: center; gap: .5rem; }
+.modal__title { font-size: 1.05rem; font-weight: 700; }
+.modal__close { padding: .3rem .55rem; font-size: .8rem; }
 .modal__product-name {
   font-size: .85rem;
   color: var(--color-muted);
@@ -229,7 +232,6 @@ function onSubmit() {
   grid-template-columns: 1fr 1fr;
   gap: .75rem;
 }
-
 @media (max-width: 480px) {
   .modal__grid { grid-template-columns: 1fr; }
 }
@@ -238,11 +240,7 @@ function onSubmit() {
 .qty-input { flex: 1; min-width: 0; }
 .unit-select { width: 90px; flex-shrink: 0; }
 
-.range-input {
-  width: 100%;
-  accent-color: var(--color-accent);
-  cursor: pointer;
-}
+.range-input { width: 100%; accent-color: var(--color-accent); cursor: pointer; }
 
 .toggle-row {
   display: flex;
@@ -253,7 +251,6 @@ function onSubmit() {
   color: var(--color-muted);
   user-select: none;
 }
-
 .toggle {
   position: relative;
   width: 36px;
@@ -278,25 +275,14 @@ function onSubmit() {
 
 .modal__actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: .5rem;
   margin-top: .25rem;
 }
-.modal__actions-right {
-  display: flex;
-  gap: .5rem;
-  margin-left: auto;
-}
+.modal__actions-right { display: flex; gap: .5rem; margin-left: auto; }
 .modal__delete { padding: .55rem .85rem; }
-.modal__confirm {
-  display: flex;
-  align-items: center;
-  gap: .4rem;
-}
-.modal__confirm-label {
-  font-size: .8rem;
-  color: var(--color-danger);
-  font-weight: 600;
-}
+.modal__confirm { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+.modal__confirm-label { font-size: .8rem; color: var(--color-danger); font-weight: 600; }
 </style>

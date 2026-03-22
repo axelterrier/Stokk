@@ -44,6 +44,7 @@ def _mongo_doc_to_product_dict(barcode: str, doc: dict) -> dict:
         "category": (doc.get("categories") or "")[:1000] or None,
         "image_url": (doc.get("image_front_url") or doc.get("image_url") or _build_image_url(barcode, doc) or "")[:1000] or None,
         "nutriscore": (doc.get("nutriscore_grade") or "").upper()[:1] or None,
+        "quantity_str": (doc.get("quantity") or "")[:50] or None,
         "energy_kcal": _safe_float(nutriments.get("energy-kcal_100g")),
         "proteins_g": _safe_float(nutriments.get("proteins_100g")),
         "carbs_g": _safe_float(nutriments.get("carbohydrates_100g")),

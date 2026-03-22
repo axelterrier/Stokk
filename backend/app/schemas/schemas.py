@@ -4,6 +4,28 @@ from uuid import UUID
 from pydantic import BaseModel
 
 
+# ── Location ───────────────────────────────────────────────────────────────────
+
+class LocationOut(BaseModel):
+    id: UUID
+    name: str
+    parent_id: UUID | None = None
+    color: str | None = None
+    model_config = {"from_attributes": True}
+
+
+class LocationCreate(BaseModel):
+    name: str
+    parent_id: UUID | None = None
+    color: str | None = None
+
+
+class LocationUpdate(BaseModel):
+    name: str | None = None
+    parent_id: UUID | None = None
+    color: str | None = None
+
+
 # ── Product ───────────────────────────────────────────────────────────────────
 
 class ProductOut(BaseModel):
@@ -13,11 +35,11 @@ class ProductOut(BaseModel):
     category: str | None = None
     image_url: str | None = None
     nutriscore: str | None = None
+    quantity_str: str | None = None
     energy_kcal: float | None = None
     proteins_g: float | None = None
     carbs_g: float | None = None
     fat_g: float | None = None
-
     model_config = {"from_attributes": True}
 
 
@@ -28,7 +50,6 @@ class ExpiryDateOut(BaseModel):
     expiry_date: date
     alert_days_before: int
     alerted: bool
-
     model_config = {"from_attributes": True}
 
 
@@ -36,7 +57,7 @@ class StockItemCreate(BaseModel):
     product_barcode: str
     quantity: float
     unit: str = "unité"
-    location: str | None = None
+    location_id: UUID | None = None
     opened: bool = False
     expiry_date: date | None = None
     alert_days_before: int = 3
@@ -47,12 +68,11 @@ class StockItemOut(BaseModel):
     product_barcode: str
     quantity: float
     unit: str
-    location: str | None
+    location: LocationOut | None = None
     opened: bool
     added_at: datetime
     product: ProductOut
     expiry_date: ExpiryDateOut | None = None
-
     model_config = {"from_attributes": True}
 
 
@@ -61,16 +81,39 @@ class StockItemOut(BaseModel):
 class StockItemUpdate(BaseModel):
     quantity: float | None = None
     unit: str | None = None
-    location: str | None = None
+    location_id: UUID | None = None
     opened: bool | None = None
     expiry_date: date | None = None
     alert_days_before: int | None = None
     clear_expiry: bool = False
 
 
+# ── Users ─────────────────────────────────────────────────────────────────────
+
+class UserOut(BaseModel):
+    id: UUID
+    username: str
+    email: str
+    is_admin: bool
+    created_at: datetime
+    model_config = {"from_attributes": True}
+
+
+class UserCreate(BaseModel):
+    username: str
+    email: str
+    password: str
+    is_admin: bool = False
+
+
+class UserUpdate(BaseModel):
+    password: str | None = None
+    is_admin: bool | None = None
+
+
 # ── Scan response ─────────────────────────────────────────────────────────────
 
 class ScanResponse(BaseModel):
     found: bool
-    source: str | None = None  # "cache" | "openfoodfacts" | None
+    source: str | None = None
     product: ProductOut | None = None
