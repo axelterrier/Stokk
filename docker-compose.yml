@@ -1,55 +1,77 @@
+version: "3.8"
+
+networks:
+  stokk_net:
+    driver: bridge
+
 services:
 
   postgres:
     image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: foodtracker
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-foodtracker}
-      POSTGRES_DB: foodtracker
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+    container_name: stokk-postgres
     restart: unless-stopped
+    networks: [stokk_net]
+    environment:
+      - POSTGRES_USER=foodtracker
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-foodtracker}
+      - POSTGRES_DB=foodtracker
+    volumes:
+      - /volume1/TorrentBox/docker/stokk/postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U foodtracker"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 15s
 
   mongodb:
     image: mongo:7
-    volumes:
-      - mongodb_data:/data/db
+    container_name: stokk-mongodb
     restart: unless-stopped
+    networks: [stokk_net]
+    volumes:
+      - /volume1/TorrentBox/docker/stokk/mongodb-data:/data/db
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 20s
 
   backend:
     image: ghcr.io/axelterrier/stokk-backend:latest
-    environment:
-      DATABASE_URL: postgresql+asyncpg://foodtracker:${POSTGRES_PASSWORD:-foodtracker}@postgres:5432/foodtracker
-      MONGO_URL: mongodb://mongodb:27017
-      MONGO_DB: ${MONGO_DB:-openfoodfacts}
-      MONGO_COLLECTION: ${MONGO_COLLECTION:-products}
-      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8721}
+    container_name: stokk-backend
+    restart: unless-stopped
+    networks: [stokk_net]
     depends_on:
       postgres:
         condition: service_healthy
       mongodb:
         condition: service_healthy
-    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://foodtracker:${POSTGRES_PASSWORD:-foodtracker}@postgres:5432/foodtracker
+      - MONGO_URL=mongodb://mongodb:27017
+      - MONGO_DB=${MONGO_DB:-openfoodfacts}
+      - MONGO_COLLECTION=${MONGO_COLLECTION:-products}
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:9300}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   frontend:
     image: ghcr.io/axelterrier/stokk-frontend:latest
-    ports:
-      - "8721:80"
-    depends_on:
-      - backend
+    container_name: stokk-frontend
     restart: unless-stopped
-
-volumes:
-  postgres_data:
-  mongodb_data:
+    networks: [stokk_net]
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "9300:80"
+    volumes:
+      # nginx.conf à copier depuis le repo : frontend/nginx.conf
+      - /volume1/TorrentBox/docker/stokk/nginx.conf:/etc/nginx/conf.d/default.conf:ro
