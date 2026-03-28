@@ -5,12 +5,19 @@ from sqlalchemy.orm import selectinload
 from uuid import UUID
 
 from app.db.database import get_db
-from app.models.models import StockItem, ExpiryDate, User
-from app.schemas.schemas import ScanResponse, StockItemCreate, StockItemOut, StockItemUpdate
+from app.models.models import Product, StockItem, ExpiryDate, User
+from app.schemas.schemas import ProductOut, ScanResponse, StockItemCreate, StockItemOut, StockItemUpdate
 from app.services.product_service import lookup_product
 from app.core.security import get_current_user
 
 router = APIRouter()
+
+
+@router.get("/products", response_model=list[ProductOut])
+async def search_products(q: str = "", db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+    stmt = select(Product).where(Product.name.ilike(f"%{q}%")).order_by(Product.name).limit(20)
+    result = await db.execute(stmt)
+    return result.scalars().all()
 
 
 @router.get("/scan/{barcode}", response_model=ScanResponse)

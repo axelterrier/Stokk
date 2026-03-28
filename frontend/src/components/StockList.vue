@@ -16,6 +16,7 @@ const emit = defineEmits<{
   delete:     [id: string]
   deleteMany: [ids: string[]]
   edit:       [item: StockItem]
+  detail:     [item: StockItem]
 }>()
 
 const confirmItem = ref<StockItem | null>(null)
@@ -201,8 +202,8 @@ function locColor(loc?: { color?: string | null }) {
           'stock-card--selecting': selectionMode,
           'stock-card--selected':  selectedIds.has(item.id),
         }"
-        @click="selectionMode ? toggleSelect(item.id) : emit('edit', item)"
-        :title="selectionMode ? '' : 'Modifier'"
+        @click="selectionMode ? toggleSelect(item.id) : emit('detail', item)"
+        :title="selectionMode ? '' : 'Voir le détail'"
       >
         <!-- Checkbox sélection -->
         <div v-if="selectionMode" class="stock-card__check">
@@ -242,22 +243,35 @@ function locColor(loc?: { color?: string | null }) {
           </div>
         </div>
 
-        <!-- Bouton suppression (masqué en mode sélection) -->
-        <button
-          v-if="!selectionMode"
-          class="stock-card__delete"
-          title="Supprimer"
-          @click.stop="confirmItem = item"
-          aria-label="Supprimer"
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="3 6 5 6 21 6"/>
-            <path d="M19 6l-1 14H6L5 6"/>
-            <path d="M10 11v6M14 11v6"/>
-            <path d="M9 6V4h6v2"/>
-          </svg>
-        </button>
+        <!-- Boutons actions (masqués en mode sélection) -->
+        <div v-if="!selectionMode" class="stock-card__btns">
+          <button
+            class="stock-card__action-btn"
+            title="Modifier"
+            @click.stop="emit('edit', item)"
+            aria-label="Modifier"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+          </button>
+          <button
+            class="stock-card__delete"
+            title="Supprimer"
+            @click.stop="confirmItem = item"
+            aria-label="Supprimer"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14H6L5 6"/>
+              <path d="M10 11v6M14 11v6"/>
+              <path d="M9 6V4h6v2"/>
+            </svg>
+          </button>
+        </div>
       </li>
     </ul>
 
@@ -385,7 +399,7 @@ function locColor(loc?: { color?: string | null }) {
 .stock-card {
   position: relative;
   display: grid;
-  grid-template-columns: 48px 1fr 28px;
+  grid-template-columns: 48px 1fr auto;
   align-items: center;
   gap: .75rem;
   background: var(--color-surface);
@@ -397,7 +411,7 @@ function locColor(loc?: { color?: string | null }) {
   transition: box-shadow var(--transition), border-color var(--transition);
 }
 .stock-card--no-img {
-  grid-template-columns: 1fr 28px;
+  grid-template-columns: 1fr auto;
 }
 .stock-card:hover { box-shadow: var(--shadow-md); border-color: #d6d3d1; }
 
@@ -440,6 +454,13 @@ function locColor(loc?: { color?: string | null }) {
 }
 
 .stock-card__qty    { font-size: .75rem; color: var(--color-muted); white-space: nowrap; }
+.stock-card__nutrition {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .2rem .4rem;
+  font-size: .68rem;
+  color: var(--color-muted);
+}
 .stock-card__opened {
   font-size: .68rem; padding: .05rem .35rem;
   background: #fff7ed; color: #c2410c;
@@ -521,6 +542,7 @@ function locColor(loc?: { color?: string | null }) {
 
 /* ── Sélection multiple ──────────────────────────────────────── */
 .stock-card--selecting { cursor: default; grid-template-columns: 48px 1fr; }
+.stock-card__nutrition { display: none; }
 .stock-card--selecting:hover { box-shadow: var(--shadow-sm); border-color: var(--color-border); }
 .stock-card--selected  { border-color: var(--color-accent); background: rgba(234,88,12,.05); }
 
@@ -557,7 +579,15 @@ function locColor(loc?: { color?: string | null }) {
 .mass-bar__actions { display: flex; align-items: center; gap: .4rem; }
 .mass-bar__confirm-label { font-size: .8rem; color: var(--color-danger); font-weight: 600; }
 
-/* Bouton suppression — colonne fixe 28px */
+/* Boutons actions */
+.stock-card__btns {
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+  flex-shrink: 0;
+}
+
+.stock-card__action-btn,
 .stock-card__delete {
   display: flex;
   align-items: center;
@@ -571,6 +601,11 @@ function locColor(loc?: { color?: string | null }) {
   cursor: pointer;
   flex-shrink: 0;
   transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+.stock-card__action-btn:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  border-color: var(--color-border);
 }
 .stock-card__delete:hover {
   background: #fef2f2;

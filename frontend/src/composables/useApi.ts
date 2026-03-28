@@ -1,4 +1,4 @@
-import type { ScanResponse, StockItem, StockItemCreate, StockItemUpdate, AppUser, UserCreate, UserUpdate, Location, LocationCreate, LocationUpdate } from '@/types'
+import type { ScanResponse, StockItem, StockItemCreate, StockItemUpdate, AppUser, UserCreate, UserUpdate, Location, LocationCreate, LocationUpdate, Product, Recipe, RecipeCreate, RecipeUpdate, CookResult } from '@/types'
 
 const BASE = import.meta.env.VITE_API_URL as string
 
@@ -92,4 +92,22 @@ export const api = {
 
   deleteLocation: (locId: string) =>
     apiFetch<void>(`/locations/${locId}`, { method: 'DELETE' }),
+
+  searchProducts: (q: string) =>
+    apiFetch<Product[]>(`/products?q=${encodeURIComponent(q)}`),
+
+  listRecipes: () =>
+    apiFetch<Recipe[]>('/recipes'),
+
+  createRecipe: (payload: RecipeCreate) =>
+    apiFetch<Recipe>('/recipes', { method: 'POST', body: JSON.stringify(payload) }),
+
+  updateRecipe: (recipeId: string, payload: RecipeUpdate) =>
+    apiFetch<Recipe>(`/recipes/${recipeId}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+
+  deleteRecipe: (recipeId: string) =>
+    apiFetch<void>(`/recipes/${recipeId}`, { method: 'DELETE' }),
+
+  cookRecipe: (recipeId: string) =>
+    apiFetch<CookResult>(`/recipes/${recipeId}/cook`, { method: 'POST' }),
 }

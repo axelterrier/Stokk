@@ -117,3 +117,58 @@ class ScanResponse(BaseModel):
     found: bool
     source: str | None = None
     product: ProductOut | None = None
+
+
+# ── Recipes ───────────────────────────────────────────────────────────────────
+
+class RecipeIngredientCreate(BaseModel):
+    product_barcode: str | None = None
+    ingredient_name: str
+    quantity: float
+    unit: str = "unité"
+
+
+class RecipeIngredientOut(BaseModel):
+    id: UUID
+    product_barcode: str | None = None
+    ingredient_name: str
+    quantity: float
+    unit: str
+    product: ProductOut | None = None
+    model_config = {"from_attributes": True}
+
+
+class RecipeCreate(BaseModel):
+    name: str
+    description: str | None = None
+    ingredients: list[RecipeIngredientCreate] = []
+
+
+class RecipeUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    ingredients: list[RecipeIngredientCreate] | None = None
+
+
+class RecipeOut(BaseModel):
+    id: UUID
+    name: str
+    description: str | None = None
+    created_by: UUID
+    created_at: datetime
+    ingredients: list[RecipeIngredientOut] = []
+    model_config = {"from_attributes": True}
+
+
+class CookIngredientResult(BaseModel):
+    ingredient_name: str
+    requested: float
+    unit: str
+    available: float
+    deducted: float
+    status: str  # "ok" | "partial" | "not_in_stock" | "unlinked"
+
+
+class CookResult(BaseModel):
+    recipe_name: str
+    results: list[CookIngredientResult]

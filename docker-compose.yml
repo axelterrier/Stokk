@@ -1,0 +1,55 @@
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: foodtracker
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-foodtracker}
+      POSTGRES_DB: foodtracker
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U foodtracker"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: mongo:7
+    volumes:
+      - mongodb_data:/data/db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: ghcr.io/axelterrier/stokk-backend:latest
+    environment:
+      DATABASE_URL: postgresql+asyncpg://foodtracker:${POSTGRES_PASSWORD:-foodtracker}@postgres:5432/foodtracker
+      MONGO_URL: mongodb://mongodb:27017
+      MONGO_DB: ${MONGO_DB:-openfoodfacts}
+      MONGO_COLLECTION: ${MONGO_COLLECTION:-products}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8721}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    image: ghcr.io/axelterrier/stokk-frontend:latest
+    ports:
+      - "8721:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  mongodb_data:

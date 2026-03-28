@@ -4,11 +4,12 @@ from contextlib import asynccontextmanager
 
 from app.core.config import settings
 from app.db.database import init_db
-from app.models.models import User, Product, StockItem, ExpiryDate, Location  # noqa: F401
+from app.models.models import User, Product, StockItem, ExpiryDate, Location, Recipe, RecipeIngredient  # noqa: F401
 from app.routes.stock import router as stock_router
 from app.routes.auth import router as auth_router
 from app.routes.users import router as users_router
 from app.routes.locations import router as locations_router
+from app.routes.recipes import router as recipes_router
 
 
 @asynccontextmanager
@@ -36,6 +37,7 @@ app.include_router(auth_router,      prefix="/api/v1", tags=["auth"])
 app.include_router(stock_router,     prefix="/api/v1", tags=["stock"])
 app.include_router(users_router,     prefix="/api/v1", tags=["users"])
 app.include_router(locations_router, prefix="/api/v1", tags=["locations"])
+app.include_router(recipes_router,   prefix="/api/v1", tags=["recipes"])
 
 
 @app.get("/health")

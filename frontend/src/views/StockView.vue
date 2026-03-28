@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import type { Product, StockItem, StockItemCreate, StockItemUpdate, Location } from '@/types'
+import type { Product, StockItem, StockItemCreate, StockItemUpdate, Location, Recipe } from '@/types'
 import { api } from '@/composables/useApi'
 import ScanInput from '@/components/ScanInput.vue'
 import ProductCard from '@/components/ProductCard.vue'
 import AddStockForm from '@/components/AddStockForm.vue'
 import StockList from '@/components/StockList.vue'
 import EditStockModal from '@/components/EditStockModal.vue'
+import StockDetailModal from '@/components/StockDetailModal.vue'
 import ExpiryDashboard from '@/components/ExpiryDashboard.vue'
 
 const scanLoading  = ref(false)
@@ -20,7 +21,9 @@ const addSuccess     = ref(false)
 
 const stockItems  = ref<StockItem[]>([])
 const locations   = ref<Location[]>([])
+const recipes     = ref<Recipe[]>([])
 const editingItem = ref<StockItem | null>(null)
+const detailItem  = ref<StockItem | null>(null)
 const editLoading = ref(false)
 
 async function onScan(barcode: string) {
@@ -73,7 +76,8 @@ async function loadStock() {
   }
 }
 
-function onEdit(item: StockItem) { editingItem.value = item }
+function onDetail(item: StockItem) { detailItem.value = item }
+function onEdit(item: StockItem) { detailItem.value = null; editingItem.value = item }
 
 async function onUpdateStock(payload: StockItemUpdate) {
   if (!editingItem.value) return
@@ -104,7 +108,11 @@ async function onDeleteMany(ids: string[]) {
 }
 
 onMounted(async () => {
-  await Promise.all([loadStock(), api.listLocations().then(l => { locations.value = l })])
+  await Promise.all([
+    loadStock(),
+    api.listLocations().then(l => { locations.value = l }),
+    api.listRecipes().then(r => { recipes.value = r }),
+  ])
 })
 </script>
 
@@ -150,6 +158,7 @@ onMounted(async () => {
         :items="stockItems"
         :locations="locations"
         :loading="stockLoading"
+        @detail="onDetail"
         @edit="onEdit"
         @delete="onDelete"
         @delete-many="onDeleteMany"
@@ -157,6 +166,14 @@ onMounted(async () => {
     </div>
 
   </div>
+
+  <StockDetailModal
+    v-if="detailItem"
+    :item="detailItem"
+    :recipes="recipes"
+    @edit="onEdit"
+    @close="detailItem = null"
+  />
 
   <EditStockModal
     v-if="editingItem"

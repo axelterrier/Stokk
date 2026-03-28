@@ -172,6 +172,17 @@ html[data-theme="dark"] .expiry--soon    { background: rgba(161,98,7,.18);   col
 html[data-theme="dark"] .expiry--urgent  { background: rgba(194,65,12,.18);  color: #fdba74; border-color: rgba(194,65,12,.35); }
 html[data-theme="dark"] .expiry--expired { background: rgba(220,38,38,.18);  color: #fca5a5; border-color: rgba(220,38,38,.35); }
 
+/* ── Dark mode: recipe badges ───────────────────────────────────── */
+html[data-theme="dark"] .status--ready   { background: rgba(21,128,61,.18);  color: #86efac; border-color: rgba(21,128,61,.35); }
+html[data-theme="dark"] .status--partial { background: rgba(161,98,7,.18);   color: #fde047; border-color: rgba(161,98,7,.35); }
+html[data-theme="dark"] .status--missing { background: rgba(220,38,38,.18);  color: #fca5a5; border-color: rgba(220,38,38,.35); }
+html[data-theme="dark"] .badge--ok       { background: rgba(21,128,61,.18);  color: #86efac; border-color: rgba(21,128,61,.35); }
+html[data-theme="dark"] .badge--partial  { background: rgba(161,98,7,.18);   color: #fde047; border-color: rgba(161,98,7,.35); }
+html[data-theme="dark"] .badge--out      { background: rgba(220,38,38,.18);  color: #fca5a5; border-color: rgba(220,38,38,.35); }
+html[data-theme="dark"] .cook-badge--ok       { background: rgba(21,128,61,.18);  color: #86efac; border-color: rgba(21,128,61,.35); }
+html[data-theme="dark"] .cook-badge--partial  { background: rgba(161,98,7,.18);   color: #fde047; border-color: rgba(161,98,7,.35); }
+html[data-theme="dark"] .cook-badge--out      { background: rgba(220,38,38,.18);  color: #fca5a5; border-color: rgba(220,38,38,.35); }
+
 /* ── Animations ─────────────────────────────────────────────────── */
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(10px); }

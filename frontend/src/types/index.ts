@@ -95,3 +95,56 @@ export interface UserUpdate {
   password?: string
   is_admin?: boolean
 }
+
+// ── Recipes ──────────────────────────────────────────────────────────────────
+
+export interface RecipeIngredientCreate {
+  product_barcode?: string | null
+  ingredient_name: string
+  quantity: number
+  unit: string
+}
+
+export interface RecipeIngredient {
+  id: string
+  product_barcode: string | null
+  ingredient_name: string
+  quantity: number
+  unit: string
+  product?: Product
+}
+
+export interface Recipe {
+  id: string
+  name: string
+  description?: string | null
+  created_by: string
+  created_at: string
+  ingredients: RecipeIngredient[]
+}
+
+export interface RecipeCreate {
+  name: string
+  description?: string | null
+  ingredients: RecipeIngredientCreate[]
+}
+
+export interface RecipeUpdate {
+  name?: string
+  description?: string | null
+  ingredients?: RecipeIngredientCreate[]
+}
+
+export interface CookIngredientResult {
+  ingredient_name: string
+  requested: number
+  unit: string
+  available: number
+  deducted: number
+  status: 'ok' | 'partial' | 'not_in_stock' | 'unlinked'
+}
+
+export interface CookResult {
+  recipe_name: string
+  results: CookIngredientResult[]
+}

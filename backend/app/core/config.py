@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "changeme"
     CORS_ORIGINS: str = "http://localhost:5173"
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @property
     def cors_origins_list(self) -> list[str]:
