@@ -24,20 +24,6 @@ services:
       retries: 5
       start_period: 15s
 
-  mongodb:
-    image: mongo:7
-    container_name: stokk-mongodb
-    restart: unless-stopped
-    networks: [stokk_net]
-    volumes:
-      - /volume1/TorrentBox/docker/stokk/mongodb-data:/data/db
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-
   backend:
     image: ghcr.io/axelterrier/stokk-backend:latest
     container_name: stokk-backend
@@ -46,11 +32,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      mongodb:
-        condition: service_healthy
     environment:
       - DATABASE_URL=postgresql+asyncpg://foodtracker:${POSTGRES_PASSWORD:-foodtracker}@postgres:5432/foodtracker
-      - MONGO_URL=mongodb://mongodb:27017
+      - MONGO_URL=${MONGO_URL:-mongodb://192.168.1.100:27017}
       - MONGO_DB=${MONGO_DB:-openfoodfacts}
       - MONGO_COLLECTION=${MONGO_COLLECTION:-products}
       - SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required}
