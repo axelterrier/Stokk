@@ -1,193 +1,327 @@
-# FoodTracker — Claude Code Context
+# Stokk — Gestion de stock alimentaire
 
-Household food stock management app for a shared home. Multi-user, barcode scanning, expiry date tracking.
+Application de gestion du stock alimentaire d'un foyer partagé. Scan de codes-barres, suivi des dates de péremption, gestion multi-utilisateurs.
 
 ---
 
 ## Stack
 
-| Layer | Technology |
+| Couche | Technologie |
 |---|---|
 | Backend | Python 3.13, FastAPI, SQLAlchemy 2 (async), asyncpg |
-| Database (business) | PostgreSQL — households, users, stock, expiry dates |
-| Database (product ref) | MongoDB — OpenFoodFacts dump (read-only) |
+| Base de données métier | PostgreSQL — utilisateurs, stock, DLC, emplacements |
+| Base de données produits | MongoDB — dump OpenFoodFacts (lecture seule) |
 | Frontend | Vue 3 + TypeScript + Vite |
-| Package manager (front) | npm |
+| Gestionnaire de paquets (front) | npm |
 
 ---
 
-## Project Structure
+## Structure du projet
 
 ```
 foodtracker-poc/
+├── docker-compose.yml             # Déploiement prod (NAS Synology)
+├── .env.docker                    # Template de variables d'environnement pour le NAS
 ├── backend/
-│   ├── main.py                        # FastAPI app, CORS, lifespan (init_db)
+│   ├── main.py                    # App FastAPI, CORS, lifespan (init_db)
 │   ├── requirements.txt
-│   ├── .env                           # Local config (not committed)
-│   ├── .env.example                   # Template
-│   ├── seed.sql                       # Creates default household + admin user
+│   ├── .env                       # Config locale (non commité)
+│   ├── .env.example               # Template
+│   ├── seed.sql                   # Crée l'utilisateur admin par défaut
+│   ├── migrate_locations.py       # Migration : table locations + FK location_id sur stock_items
+│   ├── migrate_quantity.py        # Migration : colonne quantity_str sur products
+│   ├── backfill_quantity.py       # Backfill quantity_str pour les produits déjà en cache
 │   └── app/
 │       ├── core/
-│       │   └── config.py              # pydantic-settings — reads .env
+│       │   ├── config.py          # pydantic-settings — lit .env
+│       │   └── security.py        # JWT, get_current_user, get_current_admin
 │       ├── db/
-│       │   └── database.py            # AsyncSession factory, MongoDB client, init_db()
+│       │   └── database.py        # AsyncSession, client MongoDB (Motor), init_db()
 │       ├── models/
-│       │   └── models.py              # SQLAlchemy ORM models
+│       │   └── models.py          # Modèles ORM SQLAlchemy
 │       ├── schemas/
-│       │   └── schemas.py             # Pydantic request/response schemas
+│       │   └── schemas.py         # Schémas Pydantic requête/réponse
 │       ├── services/
-│       │   └── product_service.py     # Barcode lookup: PG cache → MongoDB fallback
+│       │   └── product_service.py # Lookup produit : cache PG → fallback MongoDB
 │       └── routes/
-│           └── stock.py               # All API routes
+│           ├── auth.py            # POST /auth/login → token JWT
+│           ├── stock.py           # CRUD stock
+│           ├── locations.py       # CRUD emplacements hiérarchiques
+│           └── users.py           # CRUD utilisateurs (admin seulement)
 └── frontend/
     ├── index.html
     ├── vite.config.ts
-    ├── .env                           # VITE_API_URL, VITE_HOUSEHOLD_ID
+    ├── nginx.conf                 # Config nginx pour le container frontend (prod)
+    ├── .env                       # VITE_API_URL
     └── src/
         ├── main.ts
-        ├── App.vue                    # Root component — orchestrates all state
-        ├── style.css                  # Global design system (CSS variables, dark theme)
-        ├── types/
-        │   └── index.ts               # TypeScript interfaces mirroring backend schemas
+        ├── App.vue                # Auth wrapper : LoginForm ou AppLayout
+        ├── style.css              # Système de design global (vars CSS, thèmes clair/sombre)
+        ├── router/index.ts        # 4 routes : /, /recipes, /settings, /users
+        ├── types/index.ts         # Interfaces TypeScript miroir des schémas backend
         ├── composables/
-        │   └── useApi.ts              # All fetch calls to the backend
+        │   ├── useApi.ts          # Tous les appels fetch
+        │   ├── useAuth.ts         # Ref utilisateur module-level, fetchMe(), helpers JWT
+        │   ├── useTheme.ts        # Thème clair/sombre/système, persisté localStorage
+        │   └── usePreferences.ts  # Préférences utilisateur (showImages…)
+        ├── views/
+        │   ├── StockView.vue      # Vue principale scan/stock
+        │   ├── RecipesView.vue    # Placeholder
+        │   ├── SettingsView.vue   # Thème + gestionnaire d'emplacements
+        │   └── UsersView.vue      # Gestion utilisateurs (admin)
         └── components/
-            ├── ScanInput.vue          # Barcode input field (USB HID + keyboard Enter)
-            ├── ProductCard.vue        # Displays scanned product info
-            ├── AddStockForm.vue       # Form: quantity, unit, location, expiry date
-            ├── StockList.vue          # Stock list with edit + delete buttons
-            ├── EditStockModal.vue     # Modal for editing an existing stock item
-            └── NutriScore.vue         # Colored badge A→E
+            ├── AppLayout.vue      # Sidebar (desktop) + onglets bas (mobile)
+            ├── LoginForm.vue
+            ├── ScanInput.vue      # Saisie code-barres (USB HID + Entrée clavier)
+            ├── ProductCard.vue    # Info produit + badge source
+            ├── AddStockForm.vue   # Ajout au stock : qté/unité pré-remplis
+            ├── StockList.vue      # Liste stock : filtres, tri, suppression en masse
+            ├── EditStockModal.vue # Modal édition
+            ├── ExpiryDashboard.vue# Alertes de péremption
+            └── NutriScore.vue     # Badge coloré A→E
 ```
 
 ---
 
-## Environment Variables
+## Développement local
 
-### Backend — `backend/.env`
+### Prérequis
 
-```env
-DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@localhost:5432/foodtracker
-MONGO_URL=mongodb://localhost:27017
-MONGO_DB=openfoodfacts          # MongoDB database name
-MONGO_COLLECTION=products       # Collection name in that database
-SECRET_KEY=changeme
-CORS_ORIGINS=http://localhost:5173
-```
+- **Python 3.13** avec `venv`
+- **Node.js 20+** et `npm`
+- **PostgreSQL 16** en local (ou via Docker)
+- **MongoDB 7** en local avec le dump OpenFoodFacts importé
 
-### Frontend — `frontend/.env`
+### Importer le dump OpenFoodFacts (une seule fois)
 
-```env
-VITE_API_URL=http://localhost:8000/api/v1
-VITE_HOUSEHOLD_ID=00000000-0000-0000-0000-000000000001   # Must match a row in households table
-```
-
----
-
-## Running Locally
+Le dump est disponible sur [le site OpenFoodFacts](https://world.openfoodfacts.org/data). Télécharger le fichier BSON (`openfoodfacts-mongodbdump.tar.gz`) puis :
 
 ```bash
-# Backend (activate venv first)
+tar -xzf openfoodfacts-mongodbdump.tar.gz
+mongorestore --db openfoodfacts dump/off/products.bson
+```
+
+Le dump fait plusieurs Go et peut prendre du temps à importer.
+
+### Backend
+
+```bash
 cd backend
+python -m venv .venv
 .venv\Scripts\activate        # Windows
 source .venv/bin/activate     # Linux/Mac
+pip install -r requirements.txt
+cp .env.example .env          # puis remplir les valeurs
 uvicorn main:app --reload
+```
 
-# Frontend (separate terminal)
+### Frontend
+
+```bash
 cd frontend
+npm install
+# Créer frontend/.env avec :
+# VITE_API_URL=http://localhost:8000/api/v1
 npm run dev
 ```
 
-- API: http://localhost:8000
-- Swagger UI: http://localhost:8000/docs
-- Frontend: http://localhost:5173
+- API : http://localhost:8000
+- Swagger UI : http://localhost:8000/docs
+- Frontend : http://localhost:5173
+
+### Variables d'environnement — dev
+
+**`backend/.env`**
+```env
+DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@localhost:5432/foodtracker
+MONGO_URL=mongodb://localhost:27017
+MONGO_DB=openfoodfacts
+MONGO_COLLECTION=products
+SECRET_KEY=changeme_generate_a_real_secret
+CORS_ORIGINS=http://localhost:5173
+```
+
+**`frontend/.env`**
+```env
+VITE_API_URL=http://localhost:8000/api/v1
+```
 
 ---
 
-## Database
+## Déploiement NAS (Synology)
 
-### PostgreSQL Tables
+### Prérequis
 
-| Table | Purpose |
+1. **Docker** installé sur le NAS (via le gestionnaire de paquets Synology ou Container Manager)
+2. **MongoDB avec le dump OpenFoodFacts déjà en place** — le projet suppose qu'un container MongoDB tourne séparément avec le dump importé, et expose le port `27017` sur l'IP du NAS. Exemple de compose pour ce container :
+
+```yaml
+services:
+  mongodb:
+    image: mongo:7
+    container_name: openfoodfacts-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - /volume1/TorrentBox/docker/openfoodfacts/data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=openfoodfacts
+    command: mongod --wiredTigerCacheSizeGB 2
+```
+
+3. **L'IP locale fixe du NAS** — à vérifier avec `hostname -I | awk '{print $1}'` dans le SSH du NAS
+
+### Structure des fichiers sur le NAS
+
+Créer le dossier de déploiement :
+
+```bash
+mkdir -p /volume1/TorrentBox/docker/stokk
+```
+
+Y placer les fichiers suivants depuis le repo :
+- `docker-compose.yml`
+- `frontend/nginx.conf` → copier vers `/volume1/TorrentBox/docker/stokk/nginx.conf`
+
+### Certificat SSL (requis pour l'accès caméra)
+
+Le frontend tourne en HTTPS — obligatoire pour que `getUserMedia()` (scan caméra) fonctionne dans le navigateur. Générer un certificat auto-signé :
+
+```bash
+mkdir -p /volume1/TorrentBox/docker/stokk/ssl
+openssl req -x509 -newkey rsa:4096 -keyout /volume1/TorrentBox/docker/stokk/ssl/key.pem \
+  -out /volume1/TorrentBox/docker/stokk/ssl/cert.pem -days 3650 -nodes \
+  -subj "/CN=NAS_IP" \
+  -addext "subjectAltName=IP:NAS_IP"
+```
+
+Remplacer `NAS_IP` par l'IP du NAS (ex: `192.168.1.100`).
+
+> Le certificat auto-signé déclenchera un avertissement dans le navigateur. Accepter l'exception de sécurité une fois — ensuite l'appli fonctionne normalement.
+
+### Fichier `.env`
+
+Créer `/volume1/TorrentBox/docker/stokk/.env` :
+
+```bash
+cat > /volume1/TorrentBox/docker/stokk/.env << 'EOF'
+# Obligatoire — générer avec : python -c "import secrets; print(secrets.token_hex(32))"
+SECRET_KEY=remplace_par_une_vraie_cle
+
+# Mot de passe PostgreSQL (libre choix)
+POSTGRES_PASSWORD=un_mot_de_passe_solide
+
+# MongoDB — pointer vers l'IP du NAS (pas localhost, le backend est dans un container)
+MONGO_URL=mongodb://192.168.1.XXX:27017
+MONGO_DB=openfoodfacts
+MONGO_COLLECTION=products
+
+# CORS — URL d'accès au frontend depuis le navigateur
+CORS_ORIGINS=https://192.168.1.XXX:9300
+EOF
+```
+
+> **Pourquoi l'IP du NAS et pas `localhost` ?**
+> Le backend tourne dans un container Docker. `localhost` dans un container pointe vers le container lui-même, pas vers le NAS hôte. Il faut donc utiliser l'IP locale du NAS pour atteindre le MongoDB qui tourne sur l'hôte.
+
+### Lancement
+
+```bash
+cd /volume1/TorrentBox/docker/stokk
+sudo docker compose up -d
+```
+
+L'application est accessible sur `https://IP_DU_NAS:9300`.
+
+### Migrations (premier démarrage)
+
+Après le premier `docker compose up`, exécuter les migrations dans l'ordre :
+
+```bash
+sudo docker exec stokk-backend python migrate_locations.py
+sudo docker exec stokk-backend python migrate_quantity.py
+sudo docker exec stokk-backend python backfill_quantity.py  # optionnel
+```
+
+### Mise à jour
+
+```bash
+cd /volume1/TorrentBox/docker/stokk
+sudo docker compose pull
+sudo docker compose up -d
+```
+
+---
+
+## Base de données
+
+### Tables PostgreSQL
+
+| Table | Rôle |
 |---|---|
-| `households` | Root entity — a shared home (UUID PK) |
-| `users` | Household members, bcrypt passwords |
-| `products` | Local cache of OpenFoodFacts product data (PK = EAN barcode) |
-| `stock_items` | Physical items currently in stock |
-| `expiry_dates` | One optional DLC per stock item (1-to-0..1) |
+| `users` | Utilisateurs, mots de passe bcrypt, flag `is_admin` |
+| `products` | Cache local des données OpenFoodFacts (PK = code-barres EAN) |
+| `locations` | Emplacements de rangement hiérarchiques (FK auto-référentielle `parent_id`) |
+| `stock_items` | Articles en stock, FK → products + locations |
+| `expiry_dates` | Une DLC optionnelle par article (1-à-0..1) |
 
-All PK/FK columns use the native PostgreSQL `UUID` type. **Do not use VARCHAR for UUID columns** — asyncpg enforces strict type matching.
+Toutes les colonnes PK/FK utilisent le type natif PostgreSQL `UUID`. **Ne pas utiliser VARCHAR pour les UUID** — asyncpg impose une correspondance stricte des types.
 
-Tables are auto-created at startup via `init_db()` (SQLAlchemy `create_all`). Models must be imported in `main.py` before `init_db()` is called, otherwise `Base.metadata` is empty.
+Les tables sont créées automatiquement au démarrage via `init_db()` (SQLAlchemy `create_all`).
 
-### MongoDB — OpenFoodFacts dump
+### Logique de cache produit (`product_service.py`)
 
-Used **read-only** for product lookups by EAN barcode. Documents are indexed by `code` field (or `_id`). Fields used: `product_name_fr`, `product_name`, `brands`, `categories`, `image_front_url`, `nutriscore_grade`, `nutriments`.
+1. Chercher dans la table `products` (PostgreSQL) → retour immédiat si trouvé
+2. Interroger MongoDB par code-barres si pas en cache
+3. Sauvegarder dans `products` via `INSERT ... ON CONFLICT DO NOTHING`
+4. Retourner le produit avec un tag source (`"cache"` ou `"openfoodfacts"`)
 
-### Product Cache Logic (`product_service.py`)
-
-1. Check `products` table in PostgreSQL (cache hit → return immediately)
-2. Query MongoDB by barcode if not cached
-3. Save to `products` using `INSERT ... ON CONFLICT DO NOTHING` (safe for concurrent scans)
-4. Return product with source tag (`"cache"` or `"openfoodfacts"`)
+Le champ `quantity_str` (ex: `"330 ml"`, `"500 g"`) est extrait de MongoDB et parsé côté frontend pour pré-remplir quantité/unité dans le formulaire d'ajout.
 
 ---
 
-## API Endpoints
+## Endpoints API
 
-| Method | Route | Description |
+### Auth
+| Méthode | Route | Description |
 |---|---|---|
-| GET | `/api/v1/scan/{barcode}` | Lookup product (PG cache → MongoDB) |
-| POST | `/api/v1/stock` | Add item to stock |
-| GET | `/api/v1/stock?household_id=…` | List all stock for a household |
-| PATCH | `/api/v1/stock/{item_id}` | Update item (qty, unit, location, expiry…) |
-| DELETE | `/api/v1/stock/{item_id}` | Remove item (returns 204 No Content) |
-| GET | `/health` | Health check |
+| POST | `/api/v1/auth/login` | form-data username/password → token JWT |
 
-### Key Schema Notes
+### Stock
+| Méthode | Route | Description |
+|---|---|---|
+| GET | `/api/v1/scan/{barcode}` | Lookup produit (cache PG → MongoDB) |
+| POST | `/api/v1/stock` | Ajouter un article au stock |
+| GET | `/api/v1/stock` | Lister tout le stock |
+| PATCH | `/api/v1/stock/{item_id}` | Mise à jour partielle (qté, unité, emplacement, DLC…) |
+| DELETE | `/api/v1/stock/{item_id}` | Supprimer un article (204 No Content) |
 
-- `POST /stock` requires a prior `GET /scan/{barcode}` — the product must already be in PG cache before adding to stock.
-- `PATCH /stock/{item_id}` uses partial updates (all fields optional). Pass `clear_expiry: true` to remove an existing DLC.
-- `DELETE` returns **204 No Content** — the frontend must not try to parse the response body.
+### Emplacements
+| Méthode | Route | Description |
+|---|---|---|
+| GET | `/api/v1/locations` | Lister tous les emplacements |
+| POST | `/api/v1/locations` | Créer un emplacement (parent_id optionnel) |
+| PATCH | `/api/v1/locations/{loc_id}` | Renommer / recolorer |
+| DELETE | `/api/v1/locations/{loc_id}` | Supprimer (les enfants passent à la racine) |
 
----
+### Utilisateurs (admin seulement)
+| Méthode | Route | Description |
+|---|---|---|
+| GET | `/api/v1/users` | Lister les utilisateurs |
+| POST | `/api/v1/users` | Créer un utilisateur |
+| PATCH | `/api/v1/users/{id}` | Modifier mot de passe / flag admin |
+| DELETE | `/api/v1/users/{id}` | Supprimer (impossible de se supprimer soi-même) |
 
-## Frontend Architecture
-
-All API state lives in `App.vue`. Child components are purely presentational and communicate via props + emits.
-
-```
-App.vue
-├── ScanInput       → emits: scan(barcode)
-├── ProductCard     → displays scanned product, source badge
-├── AddStockForm    → emits: submit(StockItemCreate), cancel()
-├── StockList       → emits: edit(StockItem), delete(id)
-│   └── NutriScore  → pure display
-└── EditStockModal  → emits: submit(StockItemUpdate), close()
-```
-
-`useApi.ts` wraps all `fetch` calls. The 204 case is handled explicitly:
-```typescript
-if (res.status === 204) return undefined as T
-```
+Tous les endpoints sauf `/auth/login` nécessitent `Authorization: Bearer <token>`.
 
 ---
 
-## Key Design Decisions
+## Problèmes connus / TODOs
 
-- **No authentication** for this POC — `household_id` is hardcoded in `frontend/.env`. Auth can be added later.
-- **MongoDB is sync** (pymongo) wrapped in `asyncio.get_event_loop().run_in_executor()` — acceptable for a POC, replace with Motor for production.
-- **DLC is not derivable from barcode** — it's per-physical-item and must always be entered manually by the user.
-- **Expiry date cascade** — `StockItem.expiry_date` relationship has `cascade="all, delete-orphan"` so deleting a stock item automatically deletes its DLC row.
-
----
-
-## Known Issues / TODOs
-
-- No authentication / authorization
-- No pagination on stock list
-- No unit tests
-- MongoDB accessed synchronously (pymongo) — should use Motor for async
-- No push notifications for expiry alerts (the `alerted` flag exists in DB but nothing reads it)
-- No multi-household UI (household is hardcoded in frontend `.env`)
-- `image_url` from OpenFoodFacts is often `None` — fallback emoji shown
+- Pas de pagination sur la liste de stock
+- Pas de tests unitaires
+- MongoDB accédé de manière synchrone (pymongo) dans les scripts de migration — Motor utilisé dans l'app principale
+- Pas de notifications push pour les alertes de péremption (le flag `alerted` existe en BDD mais rien ne le lit)
+- Les produits déjà en cache ne verront pas `quantity_str` mis à jour (`ON CONFLICT DO NOTHING`) — relancer `backfill_quantity.py` manuellement si nécessaire
+- `image_url` depuis OpenFoodFacts est souvent `None` — emoji de remplacement affiché (masquable via la préférence `showImages`)

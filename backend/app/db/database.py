@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
-from pymongo import MongoClient
+from motor.motor_asyncio import AsyncIOMotorClient
 from app.core.config import settings
 
 # ── PostgreSQL ────────────────────────────────────────────────────────────────
@@ -26,17 +26,17 @@ async def init_db():
 
 # ── MongoDB ───────────────────────────────────────────────────────────────────
 
-_mongo_client: MongoClient | None = None
+_motor_client: AsyncIOMotorClient | None = None
 
 
 def get_mongo_collection():
-    global _mongo_client
-    if _mongo_client is None:
-        _mongo_client = MongoClient(
+    global _motor_client
+    if _motor_client is None:
+        _motor_client = AsyncIOMotorClient(
             settings.MONGO_URL,
             serverSelectionTimeoutMS=5000,
             socketTimeoutMS=5000,
             connectTimeoutMS=5000,
         )
-    db = _mongo_client[settings.MONGO_DB]
+    db = _motor_client[settings.MONGO_DB]
     return db[settings.MONGO_COLLECTION]

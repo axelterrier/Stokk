@@ -3,8 +3,6 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.models.models import Product
 from app.db.database import get_mongo_collection
-import asyncio
-
 
 def _build_image_url(barcode: str, doc: dict) -> str | None:
     """Construit l'URL image depuis images.selected.front quand image_front_url est absent."""
@@ -59,12 +57,9 @@ async def lookup_product(barcode: str, db: AsyncSession) -> tuple[Product | None
     if cached:
         return cached, "cache"
 
-    # 2. MongoDB
-    def _mongo_lookup():
-        col = get_mongo_collection()
-        return col.find_one({"$or": [{"code": barcode}, {"_id": barcode}]})
-
-    doc = await asyncio.get_event_loop().run_in_executor(None, _mongo_lookup)
+    # 2. MongoDB (Motor — vraiment async)
+    col = get_mongo_collection()
+    doc = await col.find_one({"$or": [{"code": barcode}, {"_id": barcode}]})
     if not doc:
         return None, None
 

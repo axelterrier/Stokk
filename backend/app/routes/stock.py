@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update as sql_update, delete as sql_delete
+from sqlalchemy import select, update as sql_update, delete as sql_delete, func
 from sqlalchemy.orm import selectinload
 from uuid import UUID
 
@@ -68,7 +68,12 @@ async def add_stock_item(payload: StockItemCreate, db: AsyncSession = Depends(ge
 
 
 @router.get("/stock", response_model=list[StockItemOut])
-async def list_stock(db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+async def list_stock(
+    skip: int = 0,
+    limit: int = 200,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
     result = await db.execute(
         select(StockItem)
         .options(
@@ -77,6 +82,8 @@ async def list_stock(db: AsyncSession = Depends(get_db), _: User = Depends(get_c
             selectinload(StockItem.location),
         )
         .order_by(StockItem.added_at.desc())
+        .offset(skip)
+        .limit(limit)
     )
     return result.scalars().all()
 
@@ -146,4 +153,46 @@ async def delete_stock_item(item_id: UUID, db: AsyncSession = Depends(get_db), _
     if not item:
         raise HTTPException(status_code=404, detail="Article introuvable")
     await db.delete(item)
+    await db.commit()
+
+
+# ── Expiry alerts ─────────────────────────────────────────────────────────────
+
+@router.get("/expiry/alerts", response_model=list[StockItemOut])
+async def get_expiry_alerts(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Articles dont la DLC arrive dans les `alert_days_before` jours (expirés inclus)."""
+    result = await db.execute(
+        select(StockItem)
+        .join(ExpiryDate, ExpiryDate.stock_item_id == StockItem.id)
+        .where(
+            # expiry_date - CURRENT_DATE <= alert_days_before
+            # En PostgreSQL : date - date = integer (nombre de jours)
+            (ExpiryDate.expiry_date - func.current_date()) <= ExpiryDate.alert_days_before
+        )
+        .options(
+            selectinload(StockItem.product),
+            selectinload(StockItem.expiry_date),
+            selectinload(StockItem.location),
+        )
+        .order_by(ExpiryDate.expiry_date)
+    )
+    return result.scalars().all()
+
+
+@router.post("/expiry/alerts/acknowledge", status_code=204)
+async def acknowledge_expiry_alerts(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Marque comme `alerted=True` tous les articles dans la fenêtre d'alerte."""
+    await db.execute(
+        sql_update(ExpiryDate)
+        .where(
+            (ExpiryDate.expiry_date - func.current_date()) <= ExpiryDate.alert_days_before
+        )
+        .values(alerted=True)
+    )
     await db.commit()
